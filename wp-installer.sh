@@ -1053,25 +1053,9 @@ if [[ "$INSTALL_SSL" =~ ^[Yy]$ ]]; then
     echo
     echo "Installing SSL..."
 
-    if [ "$WWW_MODE" = "www" ]; then
-
         certbot --nginx \
             -d "$DOMAIN" \
             -d "$WWW_DOMAIN"
-
-    elif [ "$WWW_MODE" = "non-www" ]; then
-
-        certbot --nginx \
-            -d "$DOMAIN" \
-            -d "$WWW_DOMAIN"
-
-    else
-
-        certbot --nginx \
-            -d "$DOMAIN" \
-            -d "$WWW_DOMAIN"
-
-    fi
 
     systemctl reload nginx
 
