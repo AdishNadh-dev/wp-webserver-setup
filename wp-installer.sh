@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 
 set -e
@@ -64,12 +63,15 @@ WWW_DOMAIN="www.${DOMAIN}"
 echo
 echo "How should www/non-www work?"
 echo
+
 echo "1) No redirect"
 echo "   example.com and www.example.com both work"
 echo
+
 echo "2) Redirect to www"
 echo "   example.com -> www.example.com"
 echo
+
 echo "3) Redirect to non-www"
 echo "   www.example.com -> example.com"
 echo
@@ -307,7 +309,7 @@ echo "[6/12] Creating WordPress directory..."
 
 mkdir -p "$WEB_ROOT"
 
-# Remove existing content only if directory is empty
+# Remove existing content only if directory is not empty
 if [ -n "$(find "$WEB_ROOT" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
 
     echo
@@ -317,12 +319,16 @@ if [ -n "$(find "$WEB_ROOT" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]
     read -rp "Delete existing contents and continue? [y/N]: " DELETE_EXISTING
 
     if [[ "$DELETE_EXISTING" =~ ^[Yy]$ ]]; then
+
         rm -rf "${WEB_ROOT:?}/"*
         rm -rf "${WEB_ROOT:?}/".[!.]*
         rm -rf "${WEB_ROOT:?}/"..?*
+
     else
+
         echo "Installation cancelled."
         exit 1
+
     fi
 
 fi
@@ -342,6 +348,19 @@ wget -q https://wordpress.org/latest.tar.gz
 tar xzf latest.tar.gz --strip-components=1
 
 rm -f latest.tar.gz
+
+
+# ============================================================
+# WORDPRESS OWNERSHIP
+#
+# IMPORTANT:
+# This must happen BEFORE WP-CLI creates wp-config.php.
+# ============================================================
+
+echo
+echo "Setting WordPress ownership..."
+
+chown -R www-data:www-data "$WEB_ROOT"
 
 
 # ============================================================
@@ -441,6 +460,7 @@ echo "[11/12] Creating Nginx configuration..."
 
 create_main_server()
 {
+
 cat <<EOF
 
 server {
@@ -451,6 +471,7 @@ server {
 
     root ${WEB_ROOT};
     index index.php index.html index.htm;
+
 
     # ========================================================
     # Security Headers
@@ -669,7 +690,6 @@ server {
 
         fastcgi_temp_file_write_size 256k;
 
-
         fastcgi_read_timeout 300;
 
         fastcgi_send_timeout 300;
@@ -782,6 +802,7 @@ server {
 }
 
 EOF
+
 }
 
 
@@ -897,18 +918,22 @@ ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
 
 
 # ============================================================
-# PERMISSIONS
+# FINAL WORDPRESS PERMISSIONS
 # ============================================================
 
 echo
-echo "Setting WordPress permissions..."
+echo "[12/12] Setting final WordPress permissions..."
 
+# www-data owns the complete WordPress installation
 chown -R www-data:www-data "$WEB_ROOT"
 
+# Directories
 find "$WEB_ROOT" -type d -exec chmod 755 {} \;
 
+# Files
 find "$WEB_ROOT" -type f -exec chmod 644 {} \;
 
+# Protect database credentials
 chmod 640 "$WEB_ROOT/wp-config.php"
 
 
@@ -1017,6 +1042,7 @@ chmod 600 "$CREDENTIAL_FILE"
 echo
 echo "Do you want to install SSL with Let's Encrypt now?"
 echo
+
 echo "This requires DNS for the domain to already point to this server."
 echo
 
@@ -1061,38 +1087,48 @@ echo "================================================"
 echo "WordPress installation completed"
 echo "================================================"
 echo
+
 echo "Site:"
 echo "  $SITE_URL"
 echo
+
 echo "Web root:"
 echo "  $WEB_ROOT"
 echo
+
 echo "Nginx config:"
 echo "  $NGINX_AVAILABLE"
 echo
+
 echo "Database:"
 echo "  $DB_NAME"
 echo
+
 echo "Database user:"
 echo "  $DB_USER"
 echo
+
 echo "Credentials:"
 echo "  $CREDENTIAL_FILE"
 echo
 
 if [ "$INSTALL_SSL" = "y" ] || [ "$INSTALL_SSL" = "Y" ]; then
+
     echo "SSL:"
     echo "  Installed"
+
 else
+
     echo "SSL:"
     echo "  Not installed"
     echo
+
     echo "When DNS is ready, run:"
     echo
+
     echo "  certbot --nginx -d $DOMAIN -d $WWW_DOMAIN"
+
 fi
 
 echo
 echo "================================================"
-```
-
