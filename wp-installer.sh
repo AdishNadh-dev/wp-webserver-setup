@@ -414,34 +414,127 @@ chown -R www-data:www-data /var/cache/nginx
 chmod -R 755 /var/cache/nginx
 
 
-cat > /etc/nginx/conf.d/wordpress-cache.conf <<'EOF'
+cat > /etc/nginx/nginx.conf <<'EOF'
 
-# ============================================================
-# WordPress FastCGI Cache
-# ============================================================
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
 
-fastcgi_cache_path /var/cache/nginx
-    levels=1:2
-    keys_zone=WORDPRESS:50m
-    inactive=60m
-    max_size=500m;
+events {
+    worker_connections 1024;
+    multi_accept on;
+    use epoll;
+}
 
-fastcgi_cache_key "$scheme$request_method$host$request_uri";
-
-fastcgi_cache_methods GET HEAD;
-
-
-# ============================================================
-# Rate Limiting
-# ============================================================
-
-limit_req_zone $binary_remote_addr
-    zone=login:10m
-    rate=2r/s;
-
-limit_req_zone $binary_remote_addr
-    zone=general:10m
-    rate=15r/s;
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    
+    # Performance optimizations
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    types_hash_max_size 2048;
+    
+    # Connection optimizations
+    keepalive_timeout 75s;
+    keepalive_requests 1000;
+    reset_timedout_connection on;
+    
+    # Buffer optimizations for 1GB RAM
+    client_body_buffer_size 128k;
+    client_header_buffer_size 1k;
+    large_client_header_buffers 4 4k;
+    client_max_body_size 64M;
+    client_body_timeout 30s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    
+    # File cache optimization
+    open_file_cache max=5000 inactive=30s;
+    open_file_cache_valid 60s;
+    open_file_cache_min_uses 2;
+    open_file_cache_errors on;
+    
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+    
+    # FastCGI cache config for 1GB RAM
+    fastcgi_cache_path /var/cache/nginx levels=1:2 keys_zone=WORDPRESS:50m inactive=60m max_size=500m;
+    fastcgi_cache_key "$scheme$request_method$host$request_uri";
+    fastcgi_cache_use_stale error timeout invalid_header http_500 http_503;
+    fastcgi_cache_methods GET HEAD;
+    
+    # For 2GB RAM, use:
+    # fastcgi_cache_path /var/cache/nginx levels=1:2 keys_zone=WORDPRESS:100m inactive=60m max_size=1g;
+    
+    # For 4GB RAM, use:
+    # fastcgi_cache_path /var/cache/nginx levels=1:2 keys_zone=WORDPRESS:200m inactive=60m max_size=2g;
+    
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=login:10m rate=2r/s;
+    limit_req_zone $binary_remote_addr zone=general:10m rate=15r/s;
+    
+    # Enhanced Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+    gzip_types
+        text/plain
+        text/css
+        application/json
+        application/javascript
+        text/xml
+        application/xml
+        application/xml+rss
+        text/javascript
+        application/atom+xml
+        image/svg+xml
+        application/x-font-ttf
+        application/vnd.ms-fontobject
+        font/opentype;
+    
+    # Cache bypass rules - Method
+    map $request_method $skip_cache_method {
+        default 0;
+        POST 1;
+    }
+    
+    # Cache bypass rules - URI
+    map $request_uri $skip_cache_uri {
+        default 0;
+        "~*/wp-admin/" 1;
+        "~*/wp-login.php" 1;
+        "~*/wp-cron.php" 1;
+        "~*preview=true" 1;
+        "~*\?s=" 1;
+    }
+    
+    # Cache bypass rules - Cookies
+    map $http_cookie $skip_cache_cookie {
+        default 0;
+        "~*wordpress_logged_in" 1;
+        "~*comment_author" 1;
+        "~*woocommerce_items_in_cart" 1;
+        "~*woocommerce_cart_hash" 1;
+        "~*wp-postpass" 1;
+        "~*PHPSESSID" 1;
+    }
+    
+    # SSL optimization
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+}
 
 EOF
 
@@ -947,9 +1040,9 @@ echo "Installing WordPress..."
 cd "$WEB_ROOT"
 
 if [ "$WWW_MODE" = "www" ]; then
-    SITE_URL="http://${WWW_DOMAIN}"
+    SITE_URL="https://${WWW_DOMAIN}"
 else
-    SITE_URL="http://${DOMAIN}"
+    SITE_URL="https://${DOMAIN}"
 fi
 
 sudo -u www-data wp core install \
