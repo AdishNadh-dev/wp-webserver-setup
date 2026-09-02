@@ -57,6 +57,28 @@ WWW_DOMAIN="www.${DOMAIN}"
 
 
 # ============================================================
+# BACKUP NGINX + EXISTING WORDPRESS FILES
+# ============================================================
+
+BACKUP_TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+BACKUP_DIR="/root/backup/${BACKUP_TIMESTAMP}"
+
+mkdir -p "$BACKUP_DIR"
+
+echo
+echo "================================================"
+echo "Creating backups before installation"
+echo "================================================"
+
+# Backup /etc/nginx/ if it exists
+if [ -d "/etc/nginx" ]; then
+    echo "Backing up /etc/nginx/ ..."
+    mkdir -p "$BACKUP_DIR/etc"
+    cp -a "/etc/nginx" "$BACKUP_DIR/etc/"
+fi
+
+
+# ============================================================
 # WWW REDIRECT
 # ============================================================
 
