@@ -925,7 +925,7 @@ server {
         allow all;
     }
 
-    return 301 http://${WWW_DOMAIN}\$request_uri;
+    return 301  $scheme://${WWW_DOMAIN}\$request_uri;
 }
 
 
