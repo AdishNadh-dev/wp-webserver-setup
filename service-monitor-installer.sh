@@ -99,6 +99,9 @@ for CMD in "${REQUIRED_COMMANDS[@]}"; do
         print_fail "$CMD is not available"
     fi
 done
+apt update
+
+apt install -y logrotate
 
 if command -v logrotate >/dev/null 2>&1; then
     print_pass "logrotate is available"
